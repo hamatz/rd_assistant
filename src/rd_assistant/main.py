@@ -1,12 +1,12 @@
-import asyncio
 from dotenv import load_dotenv
+load_dotenv()
+import asyncio
 from .config import Config
 from .llm.service import LLMServiceFactory
 from .core.analyzer import RequirementAnalyzer
 from .cli.interface import InteractiveDialogue
 
 async def main():
-    load_dotenv()
     try:
         config = Config()
         llm_config = config.get_llm_config()

@@ -7,6 +7,7 @@
 # Data Folders
 sessions/
 outputs/
+config/
 
 # Poetry
 poetry.lock
