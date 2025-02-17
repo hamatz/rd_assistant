@@ -238,7 +238,7 @@ class DocumentGenerator:
             "must_have": "#ff6b6b",     # 赤
             "should_have": "#ffd93d",   # 黄
             "could_have": "#6bff6b",    # 緑
-            "won't_have": "#d3d3d3"     # グレー
+            "wont_have": "#d3d3d3"     # グレー
         }
         
         for i, priority in enumerate(self.memory.feature_priorities):
