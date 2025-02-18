@@ -5,6 +5,7 @@ import os
 from dataclasses import asdict
 from .memory import ConversationMemory, Requirement, Constraint, Risk
 from .session_utils import SessionUtils
+from .types import UnderstandingStatus 
 
 class SessionStorage:
     def __init__(self, base_dir: str = "sessions"):
@@ -43,6 +44,11 @@ class SessionStorage:
             if memory.feature_priorities:
                 from dataclasses import asdict
                 session_data["feature_priorities"] = [asdict(fp) for fp in memory.feature_priorities]
+
+            if memory.understanding_history:
+                session_data["understanding_history"] = [
+                    asdict(status) for status in memory.understanding_history
+                ]
 
             file_path = self.base_dir / filename
             self.utils.dump_json(session_data, file_path)
@@ -94,6 +100,10 @@ class SessionStorage:
                 from .vision import FeaturePriority
                 for fp_data in data["feature_priorities"]:
                     memory.feature_priorities.append(FeaturePriority(**fp_data))
+
+            if "understanding_history" in data:
+                for status_data in data["understanding_history"]:
+                    memory.understanding_history.append(UnderstandingStatus(**status_data))
 
             return memory
             

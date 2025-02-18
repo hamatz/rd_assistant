@@ -20,6 +20,8 @@ from ..core.editor import RequirementsEditor
 from ..core.vision import VisionManager
 from ..core.vision import FeaturePriority
 from ..core.quality import RequirementQualityChecker
+from ..core.understanding import UnderstandingTracker
+from ..core.types import UnderstandingStatus 
 
 class InteractiveDialogue:
     def __init__(self, analyzer: RequirementAnalyzer, config: 'Config'):
@@ -32,7 +34,11 @@ class InteractiveDialogue:
         )
         self.storage = SessionStorage(config.get_session_config().get('save_dir', 'sessions'))
         self.is_running = True
-        self.debug = config.get_debug_mode() 
+        self.debug = config.get_debug_mode()
+        self.understanding_tracker = UnderstandingTracker(
+            memory=self.analyzer.memory,
+            output_dir=config.get_output_dir()
+        )
 
     def _debug_log(self, message: str, data: Any = None):
         """デバッグログを出力"""
@@ -53,21 +59,37 @@ class InteractiveDialogue:
             self.console.print(styled_message)
 
     async def _process_single_interaction(self):
-        """単一の対話処理"""
         try:
             user_input = await self.session.prompt_async("You: ")
-            
             user_input = user_input.strip()
             if not user_input:
                 return
 
-            self._debug_log("受信したコマンド:", user_input)
-
             if await self._handle_command(user_input):
                 return
 
-            print("\n⚙️ 分析中...\n") 
+            print("\n⚙️ 分析中...\n")
             response = await self.analyzer.process_input(user_input)
+
+            # 要件が追加された場合は要件一覧も更新
+            if 'analysis' in response and 'extracted_requirements' in response['analysis']:
+                if any(req['confidence'] > 0.7 for req in response['analysis']['extracted_requirements']):
+                    self.understanding_tracker.update_requirements()
+            
+            if 'understanding' in response:
+                understanding = response['understanding']
+                status = UnderstandingStatus(
+                    timestamp=datetime.now(),
+                    confidence=understanding.get('confidence', 0.0),
+                    key_points=understanding.get('keyPoints', []),
+                    interpretations=understanding.get('interpretations', {}),
+                    uncertain_areas=understanding.get('uncertainAreas', []),
+                    user_input=user_input,
+                    ai_response=response['response']['message']
+                )
+                self.analyzer.memory.add_understanding(status)
+                self.understanding_tracker.add_status(status)
+                
             self._display_response(response)
 
         except Exception as e:
@@ -203,6 +225,15 @@ class InteractiveDialogue:
                 file_path = sessions[index]["file_path"]
                 self.analyzer.memory = self.storage.load_session(file_path)
                 print(f"\n✅ セッションを読み込みました: {self.analyzer.memory.project_name}\n")
+                if self.analyzer.memory.understanding_history:
+                    self.understanding_tracker = UnderstandingTracker(
+                        memory=self.analyzer.memory,
+                        output_dir=self.config.get_output_dir()
+                    )
+                    for status in self.analyzer.memory.understanding_history:
+                        self.understanding_tracker.add_status(status)
+                    print(f"\n✅ 過去の理解状況履歴 ({len(self.analyzer.memory.understanding_history)}件) を復元しました")
+                    print(f"理解状況は {self.understanding_tracker.understanding_file} に保存されています\n")
             else:
                 print("\n❌ 無効な番号です。\n")
         except ValueError:
@@ -347,6 +378,7 @@ class InteractiveDialogue:
                                     }
                                 )
                                 print("✅ 要件を更新しました。")
+                                self.understanding_tracker.update_requirements()
                                 
                                 save_confirm = await self.session.prompt_async("変更を保存しますか？ (Y/n): ")
                                 if save_confirm.lower().strip() not in ['n', 'no']:
@@ -378,6 +410,25 @@ class InteractiveDialogue:
             try:
                 organizer = RequirementsOrganizer(self.analyzer.llm_service)
                 result = await organizer.organize_requirements(self.analyzer.memory)
+
+                status = UnderstandingStatus(
+                    timestamp=datetime.now(),
+                    confidence=0.9,  # 再整理後は高い確信度
+                    key_points=[
+                        "要件の再整理を実行",
+                        f"{len(result.changes_made)}件の変更を検出",
+                        f"{len(result.suggestions)}件の改善提案を生成"
+                    ],
+                    interpretations={
+                        "変更内容": "\n".join([f"- {change['description']}" for change in result.changes_made]),
+                        "改善提案": "\n".join([f"- {suggestion}" for suggestion in result.suggestions])
+                    },
+                    uncertain_areas=[],  # 再整理後は不確実な部分を解消
+                    user_input="organize コマンドを実行",
+                    ai_response="要件の再整理を完了しました"
+                )
+                self.analyzer.memory.add_understanding(status)
+                self.understanding_tracker.add_status(status)
                 
                 print("\n📋 再整理の結果:")
                 print("-" * 50)
@@ -405,6 +456,7 @@ class InteractiveDialogue:
                     self.analyzer.memory.record_organization(result.changes_made)
                     self.analyzer.memory.requirements = result.organized_requirements
                     print("\n✅ 要件を更新しました。\n")
+                    self.understanding_tracker.update_requirements()
                 else:
                     print("\n⚠️ 変更を取り消しました。\n")
                     
@@ -446,6 +498,33 @@ class InteractiveDialogue:
                 
                 result = await reviewer.review_requirements(self.analyzer.memory, document)
                 print("✅ レビューが完了しました")
+
+                status = UnderstandingStatus(
+                    timestamp=datetime.now(),
+                    confidence=0.85,  # レビュー完了後は高い確信度
+                    key_points=[
+                        "要件定義書の包括的レビューを実行",
+                        f"{len(result.comments)}件のレビューコメントを生成",
+                        f"{len(result.improvement_suggestions)}件の改善提案を特定"
+                    ],
+                    interpretations={
+                        "総合評価": result.overall_evaluation,
+                        "主要な指摘事項": "\n".join([
+                            f"- {comment.content} ({comment.importance})"
+                            for comment in result.comments
+                            if comment.importance == "high"
+                        ])
+                    },
+                    uncertain_areas=[
+                        suggestion["suggestion"]
+                        for suggestion in result.improvement_suggestions
+                        if suggestion.get("priority") == "high"
+                    ],
+                    user_input="review コマンドを実行",
+                    ai_response=result.overall_evaluation
+                )
+                self.analyzer.memory.add_understanding(status)
+                self.understanding_tracker.add_status(status)
                 
                 self._display_review_results(result)
                 
@@ -603,6 +682,7 @@ class InteractiveDialogue:
                 for idx, suggestion in zip(selected_indices, selected_suggestions):
                     if await self._generate_and_append_requirement(suggestion):
                         applied_suggestions.add(idx)
+                        self.understanding_tracker.update_requirements()
 
                 if remaining_suggestions:
                     continue_response = await self.session.prompt_async(
@@ -764,7 +844,7 @@ class InteractiveDialogue:
             print()
 
     def _show_welcome_message(self):
-        print("\n💡 要件定義支援システム")
+        print("\n💡 RD-Assistant - 要件定義支援システム")
         print("=" * 50)
         print("こんにちは！プロジェクトの要件定義のお手伝いをさせていただきます。")
         print("プロジェクトについて、どんなことでも構いませんのでお聞かせください。")
@@ -785,11 +865,14 @@ class InteractiveDialogue:
         description = await self.session.prompt_async("概要: ")
         
         self.analyzer.set_project_info(name, description)
+
+        self.understanding_tracker = UnderstandingTracker(
+            memory=self.analyzer.memory,
+            output_dir=self.config.get_output_dir()
+        )
         
-        print("\n✅ プロジェクト情報を保存しました。\n")
-        print("それでは、プロジェクトの要件について教えてください。")
-        print("自然な会話の中から要件を抽出していきます。\n")
-        print("最初に vision コマンドを実行し、プロジェクトのビジョンを登録しておくのがオススメです。\n")
+        print("\n✅ プロジェクト情報を保存しました。")
+        print(f"理解状況は {self.understanding_tracker.understanding_file} に記録されます。\n")
 
     def _display_response(self, response: Dict):
         """応答の表示"""
@@ -1190,6 +1273,40 @@ class InteractiveDialogue:
         for req, score in sorted_scores:
             if score.total >= 0.6:
                 self._display_quality_result(req, score)
+
+        avg_score = sum(score.total for _, score in quality_scores) / len(quality_scores)
+        critical_issues = [
+            (req, score) for req, score in quality_scores
+            if score.total < 0.6
+        ]
+        
+        status = UnderstandingStatus(
+            timestamp=datetime.now(),
+            confidence=avg_score,
+            key_points=[
+                f"全{total_reqs}件の要件を品質チェック",
+                f"平均品質スコア: {avg_score:.2f}",
+                f"要改善の要件: {len(critical_issues)}件"
+            ],
+            interpretations={
+                "品質評価": "\n".join([
+                    f"- {req.content}: {score.total:.2f}"
+                    for req, score in quality_scores
+                ]),
+                "重要な改善点": "\n".join([
+                    f"- {req.content}: {score.suggestions[0] if score.suggestions else '改善提案なし'}"
+                    for req, score in critical_issues
+                ])
+            },
+            uncertain_areas=[
+                f"{req.content} (スコア: {score.total:.2f})"
+                for req, score in critical_issues
+            ],
+            user_input="quality コマンドを実行",
+            ai_response=f"品質チェックを完了しました。平均スコア: {avg_score:.2f}"
+        )
+        self.analyzer.memory.add_understanding(status)
+        self.understanding_tracker.add_status(status)
 
         self._display_overall_suggestions(quality_scores)
 

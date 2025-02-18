@@ -38,6 +38,14 @@ class PromptTemplate:
         "message": "ユーザーへの応答メッセージ",
         "tone": "共感的|提案的|確認的|警告的"
     },
+    "understanding": {
+        "confidence": 0.0-1.0,
+        "keyPoints": ["抽出したポイント"],
+        "interpretations": {
+            "分類": "解釈内容"
+        },
+        "uncertainAreas": ["確認が必要な点"]
+    },
     "analysis": {
         "extracted_requirements": [
             {
