@@ -26,7 +26,7 @@ class UnderstandingTracker:
     
     def _update_markdown(self):
         """理解状況のMarkdownを更新"""
-        content = ["# 要件定義支援AIの理解状況\n"]
+        content = ["# RD-Assistantの理解状況\n"]
         content.append(f"最終更新: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         
         if self.history:
@@ -53,11 +53,11 @@ class UnderstandingTracker:
                     content.append(f"- ❓ {area}")
             
             # 対話履歴
-            content.append("\n## 対話履歴")
+            content.append("\n### 対話履歴")
             for status in reversed(self.history):
-                content.append(f"\n### {status.timestamp.strftime('%H:%M:%S')}")
+                content.append(f"\n#### {status.timestamp.strftime('%H:%M:%S')}")
                 content.append(f"**ユーザー**: {status.user_input}")
-                content.append(f"\n**AI**: {status.ai_response}")
+                content.append(f"\n**RD-Assistant**: {status.ai_response}")
                 content.append("\n---")
         
         # ファイルに保存

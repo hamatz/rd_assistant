@@ -396,6 +396,25 @@ class InteractiveDialogue:
             try:
                 organizer = RequirementsOrganizer(self.analyzer.llm_service)
                 result = await organizer.organize_requirements(self.analyzer.memory)
+
+                status = UnderstandingStatus(
+                    timestamp=datetime.now(),
+                    confidence=0.9,  # 再整理後は高い確信度
+                    key_points=[
+                        "要件の再整理を実行",
+                        f"{len(result.changes_made)}件の変更を検出",
+                        f"{len(result.suggestions)}件の改善提案を生成"
+                    ],
+                    interpretations={
+                        "変更内容": "\n".join([f"- {change['description']}" for change in result.changes_made]),
+                        "改善提案": "\n".join([f"- {suggestion}" for suggestion in result.suggestions])
+                    },
+                    uncertain_areas=[],  # 再整理後は不確実な部分を解消
+                    user_input="organize コマンドを実行",
+                    ai_response="要件の再整理を完了しました"
+                )
+                self.analyzer.memory.add_understanding(status)
+                self.understanding_tracker.add_status(status)
                 
                 print("\n📋 再整理の結果:")
                 print("-" * 50)
@@ -464,6 +483,33 @@ class InteractiveDialogue:
                 
                 result = await reviewer.review_requirements(self.analyzer.memory, document)
                 print("✅ レビューが完了しました")
+
+                status = UnderstandingStatus(
+                    timestamp=datetime.now(),
+                    confidence=0.85,  # レビュー完了後は高い確信度
+                    key_points=[
+                        "要件定義書の包括的レビューを実行",
+                        f"{len(result.comments)}件のレビューコメントを生成",
+                        f"{len(result.improvement_suggestions)}件の改善提案を特定"
+                    ],
+                    interpretations={
+                        "総合評価": result.overall_evaluation,
+                        "主要な指摘事項": "\n".join([
+                            f"- {comment.content} ({comment.importance})"
+                            for comment in result.comments
+                            if comment.importance == "high"
+                        ])
+                    },
+                    uncertain_areas=[
+                        suggestion["suggestion"]
+                        for suggestion in result.improvement_suggestions
+                        if suggestion.get("priority") == "high"
+                    ],
+                    user_input="review コマンドを実行",
+                    ai_response=result.overall_evaluation
+                )
+                self.analyzer.memory.add_understanding(status)
+                self.understanding_tracker.add_status(status)
                 
                 self._display_review_results(result)
                 
@@ -1210,6 +1256,40 @@ class InteractiveDialogue:
         for req, score in sorted_scores:
             if score.total >= 0.6:
                 self._display_quality_result(req, score)
+
+        avg_score = sum(score.total for _, score in quality_scores) / len(quality_scores)
+        critical_issues = [
+            (req, score) for req, score in quality_scores
+            if score.total < 0.6
+        ]
+        
+        status = UnderstandingStatus(
+            timestamp=datetime.now(),
+            confidence=avg_score,
+            key_points=[
+                f"全{total_reqs}件の要件を品質チェック",
+                f"平均品質スコア: {avg_score:.2f}",
+                f"要改善の要件: {len(critical_issues)}件"
+            ],
+            interpretations={
+                "品質評価": "\n".join([
+                    f"- {req.content}: {score.total:.2f}"
+                    for req, score in quality_scores
+                ]),
+                "重要な改善点": "\n".join([
+                    f"- {req.content}: {score.suggestions[0] if score.suggestions else '改善提案なし'}"
+                    for req, score in critical_issues
+                ])
+            },
+            uncertain_areas=[
+                f"{req.content} (スコア: {score.total:.2f})"
+                for req, score in critical_issues
+            ],
+            user_input="quality コマンドを実行",
+            ai_response=f"品質チェックを完了しました。平均スコア: {avg_score:.2f}"
+        )
+        self.analyzer.memory.add_understanding(status)
+        self.understanding_tracker.add_status(status)
 
         self._display_overall_suggestions(quality_scores)
 
