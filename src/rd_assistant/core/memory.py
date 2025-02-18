@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from .vision import ProjectVision, FeaturePriority
 from .history import ChangeHistoryManager
+from .types import UnderstandingStatus 
 
 @dataclass
 class Requirement:
@@ -42,6 +43,7 @@ class ConversationMemory:
     current_focus: Optional[str] = None
     feature_priorities: List[FeaturePriority] = field(default_factory=list)
     history_manager: ChangeHistoryManager = field(default_factory=ChangeHistoryManager)
+    understanding_history: List[UnderstandingStatus] = field(default_factory=list)
     
     def add_requirement(self, requirement_data: Dict):
         """要件を追加"""
@@ -61,6 +63,10 @@ class ConversationMemory:
             details=requirement_data
         )
     
+    def add_understanding(self, status: UnderstandingStatus):
+        """理解状況を追加"""
+        self.understanding_history.append(status)
+
     def update_requirement(self, old_req: Requirement, new_data: Dict):
         """要件を更新"""
         old_data = {

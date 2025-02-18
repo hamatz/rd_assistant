@@ -1,6 +1,7 @@
 from enum import Enum
 from dataclasses import dataclass
 from typing import Dict, List, Optional
+from datetime import datetime
 
 class ProjectContext(Enum):
     PERSONAL = "personal"
@@ -35,3 +36,13 @@ class ProjectInfo:
     metadata: ProjectMetadata
     created_at: str
     updated_at: str
+
+@dataclass
+class UnderstandingStatus:
+    timestamp: datetime
+    confidence: float
+    key_points: List[str]
+    interpretations: Dict[str, str]
+    uncertain_areas: List[str]
+    user_input: str
+    ai_response: str

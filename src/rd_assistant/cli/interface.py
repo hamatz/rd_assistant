@@ -20,6 +20,8 @@ from ..core.editor import RequirementsEditor
 from ..core.vision import VisionManager
 from ..core.vision import FeaturePriority
 from ..core.quality import RequirementQualityChecker
+from ..core.understanding import UnderstandingTracker
+from ..core.types import UnderstandingStatus 
 
 class InteractiveDialogue:
     def __init__(self, analyzer: RequirementAnalyzer, config: 'Config'):
@@ -32,7 +34,8 @@ class InteractiveDialogue:
         )
         self.storage = SessionStorage(config.get_session_config().get('save_dir', 'sessions'))
         self.is_running = True
-        self.debug = config.get_debug_mode() 
+        self.debug = config.get_debug_mode()
+        self.understanding_tracker = UnderstandingTracker(config.get_output_dir())
 
     def _debug_log(self, message: str, data: Any = None):
         """デバッグログを出力"""
@@ -53,21 +56,32 @@ class InteractiveDialogue:
             self.console.print(styled_message)
 
     async def _process_single_interaction(self):
-        """単一の対話処理"""
         try:
             user_input = await self.session.prompt_async("You: ")
-            
             user_input = user_input.strip()
             if not user_input:
                 return
 
-            self._debug_log("受信したコマンド:", user_input)
-
             if await self._handle_command(user_input):
                 return
 
-            print("\n⚙️ 分析中...\n") 
+            print("\n⚙️ 分析中...\n")
             response = await self.analyzer.process_input(user_input)
+            
+            if 'understanding' in response:
+                understanding = response['understanding']
+                status = UnderstandingStatus(
+                    timestamp=datetime.now(),
+                    confidence=understanding.get('confidence', 0.0),
+                    key_points=understanding.get('keyPoints', []),
+                    interpretations=understanding.get('interpretations', {}),
+                    uncertain_areas=understanding.get('uncertainAreas', []),
+                    user_input=user_input,
+                    ai_response=response['response']['message']
+                )
+                self.analyzer.memory.add_understanding(status)
+                self.understanding_tracker.add_status(status)
+                
             self._display_response(response)
 
         except Exception as e:
@@ -203,6 +217,10 @@ class InteractiveDialogue:
                 file_path = sessions[index]["file_path"]
                 self.analyzer.memory = self.storage.load_session(file_path)
                 print(f"\n✅ セッションを読み込みました: {self.analyzer.memory.project_name}\n")
+                if self.analyzer.memory.understanding_history:
+                    for status in self.analyzer.memory.understanding_history:
+                        self.understanding_tracker.add_status(status)
+                    print(f"\n✅ 過去の理解状況履歴 ({len(self.analyzer.memory.understanding_history)}件) を復元しました\n")
             else:
                 print("\n❌ 無効な番号です。\n")
         except ValueError:
@@ -768,6 +786,8 @@ class InteractiveDialogue:
         print("=" * 50)
         print("こんにちは！プロジェクトの要件定義のお手伝いをさせていただきます。")
         print("プロジェクトについて、どんなことでも構いませんのでお聞かせください。")
+        print("\n💡 システムの理解状況は outputs/understanding.md に随時記録されます。")
+        print("    VSCodeなどで開いておくと、リアルタイムに更新を確認できますのでぜひご活用ください！")
         print("\n使用可能なコマンド:")
         print("- load/読込: 保存されたセッションを読み込む")
         print("- save/保存: 現在のセッションを保存する")
