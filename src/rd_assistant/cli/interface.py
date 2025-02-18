@@ -35,7 +35,10 @@ class InteractiveDialogue:
         self.storage = SessionStorage(config.get_session_config().get('save_dir', 'sessions'))
         self.is_running = True
         self.debug = config.get_debug_mode()
-        self.understanding_tracker = UnderstandingTracker(config.get_output_dir())
+        self.understanding_tracker = UnderstandingTracker(
+            memory=self.analyzer.memory,
+            output_dir=config.get_output_dir()
+        )
 
     def _debug_log(self, message: str, data: Any = None):
         """デバッグログを出力"""
@@ -67,6 +70,11 @@ class InteractiveDialogue:
 
             print("\n⚙️ 分析中...\n")
             response = await self.analyzer.process_input(user_input)
+
+            # 要件が追加された場合は要件一覧も更新
+            if 'analysis' in response and 'extracted_requirements' in response['analysis']:
+                if any(req['confidence'] > 0.7 for req in response['analysis']['extracted_requirements']):
+                    self.understanding_tracker.update_requirements()
             
             if 'understanding' in response:
                 understanding = response['understanding']
@@ -218,9 +226,14 @@ class InteractiveDialogue:
                 self.analyzer.memory = self.storage.load_session(file_path)
                 print(f"\n✅ セッションを読み込みました: {self.analyzer.memory.project_name}\n")
                 if self.analyzer.memory.understanding_history:
+                    self.understanding_tracker = UnderstandingTracker(
+                        memory=self.analyzer.memory,
+                        output_dir=self.config.get_output_dir()
+                    )
                     for status in self.analyzer.memory.understanding_history:
                         self.understanding_tracker.add_status(status)
-                    print(f"\n✅ 過去の理解状況履歴 ({len(self.analyzer.memory.understanding_history)}件) を復元しました\n")
+                    print(f"\n✅ 過去の理解状況履歴 ({len(self.analyzer.memory.understanding_history)}件) を復元しました")
+                    print(f"理解状況は {self.understanding_tracker.understanding_file} に保存されています\n")
             else:
                 print("\n❌ 無効な番号です。\n")
         except ValueError:
@@ -365,6 +378,7 @@ class InteractiveDialogue:
                                     }
                                 )
                                 print("✅ 要件を更新しました。")
+                                self.understanding_tracker.update_requirements()
                                 
                                 save_confirm = await self.session.prompt_async("変更を保存しますか？ (Y/n): ")
                                 if save_confirm.lower().strip() not in ['n', 'no']:
@@ -442,6 +456,7 @@ class InteractiveDialogue:
                     self.analyzer.memory.record_organization(result.changes_made)
                     self.analyzer.memory.requirements = result.organized_requirements
                     print("\n✅ 要件を更新しました。\n")
+                    self.understanding_tracker.update_requirements()
                 else:
                     print("\n⚠️ 変更を取り消しました。\n")
                     
@@ -667,6 +682,7 @@ class InteractiveDialogue:
                 for idx, suggestion in zip(selected_indices, selected_suggestions):
                     if await self._generate_and_append_requirement(suggestion):
                         applied_suggestions.add(idx)
+                        self.understanding_tracker.update_requirements()
 
                 if remaining_suggestions:
                     continue_response = await self.session.prompt_async(
@@ -828,12 +844,10 @@ class InteractiveDialogue:
             print()
 
     def _show_welcome_message(self):
-        print("\n💡 要件定義支援システム")
+        print("\n💡 RD-Assistant - 要件定義支援システム")
         print("=" * 50)
         print("こんにちは！プロジェクトの要件定義のお手伝いをさせていただきます。")
         print("プロジェクトについて、どんなことでも構いませんのでお聞かせください。")
-        print("\n💡 システムの理解状況は outputs/understanding.md に随時記録されます。")
-        print("    VSCodeなどで開いておくと、リアルタイムに更新を確認できますのでぜひご活用ください！")
         print("\n使用可能なコマンド:")
         print("- load/読込: 保存されたセッションを読み込む")
         print("- save/保存: 現在のセッションを保存する")
@@ -851,11 +865,14 @@ class InteractiveDialogue:
         description = await self.session.prompt_async("概要: ")
         
         self.analyzer.set_project_info(name, description)
+
+        self.understanding_tracker = UnderstandingTracker(
+            memory=self.analyzer.memory,
+            output_dir=self.config.get_output_dir()
+        )
         
-        print("\n✅ プロジェクト情報を保存しました。\n")
-        print("それでは、プロジェクトの要件について教えてください。")
-        print("自然な会話の中から要件を抽出していきます。\n")
-        print("最初に vision コマンドを実行し、プロジェクトのビジョンを登録しておくのがオススメです。\n")
+        print("\n✅ プロジェクト情報を保存しました。")
+        print(f"理解状況は {self.understanding_tracker.understanding_file} に記録されます。\n")
 
     def _display_response(self, response: Dict):
         """応答の表示"""
