@@ -1172,7 +1172,7 @@ class InteractiveDialogue:
                         print(f"  ・{feature.feature}")
                         if feature.dependencies:
                             print(f"    依存: {', '.join(feature.dependencies)}")
-            
+
             confirm = await self.session.prompt_async("\nこの優先順位付けで確定しますか？ (Y/n): ")
             if confirm.lower().strip() not in ['n', 'no']:
                 self.analyzer.memory.update_priorities(priorities)
@@ -1206,6 +1206,7 @@ class InteractiveDialogue:
                     self._save_session()
         else:
             print("\n⚠️ 優先順位が設定されませんでした。")
+
 
     async def _handle_prioritize_command(self):
         """優先順位付けコマンドのハンドラ"""

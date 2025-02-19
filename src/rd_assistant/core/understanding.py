@@ -137,45 +137,73 @@ class UnderstandingTracker:
             f.write("\n".join(content))
 
     def _generate_priority_flowchart(self) -> str:
-        """優先順位を考慮したフローチャートを生成"""
+        """優先順位を考慮した階層型フローチャートを生成"""
         lines = ["graph TD"]
         
-        colors = {
-            "must_have": "#ff6b6b",     # 赤
-            "should_have": "#ffd93d",   # 黄
-            "could_have": "#6bff6b",    # 緑
-            "wont_have": "#d3d3d3"     # グレー
+        # 優先度ごとのスタイル定義
+        priority_styles = {
+            "must_have": {
+                "color": "#ff6b6b",
+                "prefix": "🔴",
+                "title": "Must Have（必須）"
+            },
+            "should_have": {
+                "color": "#ffd93d",
+                "prefix": "🟡",
+                "title": "Should Have（重要）"
+            },
+            "could_have": {
+                "color": "#6bff6b",
+                "prefix": "🟢",
+                "title": "Could Have（あると良い）"
+            },
+            "won't_have": {
+                "color": "#d3d3d3",
+                "prefix": "⚪",
+                "title": "Won't Have（対象外）"
+            }
         }
         
-        # ノードの生成
+        # 優先度ごとにグループ化
+        grouped_reqs = {
+            "must_have": [],
+            "should_have": [],
+            "could_have": [],
+            "won't_have": []
+        }
+        
+        # 要件をグループに分類
         for i, req in enumerate(self.memory.requirements):
-            node_id = f"R{i}"
             priority = req.metadata.get('priority', 'undefined')
-            color = colors.get(priority, "#d3d3d3")
-            
-            # ノードのスタイル設定
-            lines.append(f"    {node_id}[{req.content}]")
-            lines.append(f"    style {node_id} fill:{color}")
-            
-            # 依存関係の設定
-            if 'dependencies' in req.metadata:
-                for dep in req.metadata['dependencies']:
-                    for j, other_req in enumerate(self.memory.requirements):
-                        if other_req.content == dep:
-                            lines.append(f"    R{j} --> {node_id}")
+            if priority in grouped_reqs:
+                grouped_reqs[priority].append((i, req))
         
-        # 凡例の追加
-        lines.append("    subgraph 優先度")
-        lines.append("    L1[Must Have]")
-        lines.append("    L2[Should Have]")
-        lines.append("    L3[Could Have]")
-        lines.append('    L4["Won\'t Have"]')
-        lines.append("    end")
+        # サブグラフとして各優先度グループを生成
+        for priority, style in priority_styles.items():
+            reqs = grouped_reqs[priority]
+            if reqs:
+                lines.append(f"    subgraph {priority}_group[\"{style['title']}\"]")
+                
+                # グループ内の要件を追加
+                for i, (idx, req) in enumerate(reqs):
+                    node_id = f"R{idx}"
+                    content = req.content if len(req.content) < 30 else req.content[:27] + "..."
+                    lines.append(f"        {node_id}[\"{style['prefix']} {content}\"]")
+                    lines.append(f"        style {node_id} fill:{style['color']}")
+                
+                lines.append("    end")
         
-        # 凡例のスタイル
-        lines.append(f"    style L1 fill:{colors['must_have']}")
-        lines.append(f"    style L2 fill:{colors['should_have']}")
-        lines.append(f"    style L3 fill:{colors['could_have']}")
-        lines.append(f"    style L4 fill:{colors['wont_have']}")
+        # 依存関係の追加
+        for priority in priority_styles.keys():
+            for idx, req in grouped_reqs[priority]:
+                if 'dependencies' in req.metadata:
+                    for dep in req.metadata['dependencies']:
+                        for other_idx, other_req in enumerate(self.memory.requirements):
+                            if other_req.content == dep:
+                                lines.append(f"    R{other_idx} --> R{idx}")
+        
+        # グラフの方向を上から下に設定
+        lines.append("    %% 方向設定")
+        lines.append("    direction TB")
         
         return "\n".join(lines)
