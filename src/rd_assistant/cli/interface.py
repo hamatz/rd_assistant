@@ -1164,7 +1164,7 @@ class InteractiveDialogue:
         
         if priorities:
             print("\n📋 設定された優先順位:")
-            for priority_type in ["must_have", "should_have", "could_have", "won't_have"]:
+            for priority_type in ["must_have", "should_have", "could_have", "wont_have"]:
                 features = [p for p in priorities if p.priority == priority_type]
                 if features:
                     print(f"\n{priority_descriptions[priority_type]}:")
@@ -1177,6 +1177,29 @@ class InteractiveDialogue:
             if confirm.lower().strip() not in ['n', 'no']:
                 self.analyzer.memory.update_priorities(priorities)
                 print("✅ 優先順位を更新しました。")
+
+                status = UnderstandingStatus(
+                    timestamp=datetime.now(),
+                    confidence=0.9,  # 優先順位付けは明示的な操作なので高い確信度
+                    key_points=[
+                        "要件の優先順位付けを実行",
+                        f"Must Have: {len([p for p in priorities if p.priority == 'must_have'])}件",
+                        f"Should Have: {len([p for p in priorities if p.priority == 'should_have'])}件",
+                        f"Could Have: {len([p for p in priorities if p.priority == 'could_have'])}件",
+                        f"Won't Have: {len([p for p in priorities if p.priority == 'wont_have'])}件"
+                    ],
+                    interpretations={
+                        "優先順位の更新": "\n".join([
+                            f"- {p.feature}: {p.priority} ({p.rationale})"
+                            for p in priorities
+                        ])
+                    },
+                    uncertain_areas=[],  # 優先順位付けは明示的な選択なので不確実な部分はない
+                    user_input="prioritize コマンドを実行",
+                    ai_response="要件の優先順位付けを完了しました"
+                )
+                self.analyzer.memory.add_understanding(status)
+                self.understanding_tracker.add_status(status)
                 
                 save_confirm = await self.session.prompt_async("変更を保存しますか？ (Y/n): ")
                 if save_confirm.lower().strip() not in ['n', 'no']:
@@ -1194,6 +1217,7 @@ class InteractiveDialogue:
 
             vision_manager = VisionManager(self.analyzer.llm_service)
             await self._prioritize_requirements(vision_manager)
+            self.understanding_tracker.update_requirements()
         except Exception as e:
             print(f"❌ 優先順位付けでエラーが発生しました: {str(e)}")
 

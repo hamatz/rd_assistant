@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from .memory import ConversationMemory
+from .visualizer import RequirementsVisualizer
 
 @dataclass
 class UnderstandingStatus:
@@ -21,6 +22,7 @@ class UnderstandingTracker:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.history: List[UnderstandingStatus] = []
         self.understanding_file = self._get_understanding_file()
+        self.visualizer = RequirementsVisualizer()
         
     def update_requirements(self):
         """要件一覧が変更された際に呼び出す"""
@@ -41,6 +43,25 @@ class UnderstandingTracker:
         """理解状況のMarkdownを更新"""
         content = ["# RD-Assistantの理解状況\n"]
         content.append(f"最終更新: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+
+        content.append("## 🗺 要件の全体像")
+        content.append("\n以下のマインドマップは、現在の要件の構造を表しています：")
+        content.append("\n```mermaid")
+        content.append(self.visualizer.generate_mindmap(self.memory))
+        content.append("```\n")
+
+        content.append("## 🔄 要件の関係性")
+        content.append("\n以下の図は、要件間の依存関係や関連性を示しています：")
+        content.append("\n```mermaid")
+        content.append(self.visualizer.generate_flowchart(self.memory))
+        content.append("```\n")
+
+        if any(hasattr(req, 'metadata') and 'priority' in req.metadata for req in self.memory.requirements):
+            content.append("## 📊 優先順位マップ")
+            content.append("\n以下の図は、要件の優先順位と依存関係を示しています：")
+            content.append("\n```mermaid")
+            content.append(self._generate_priority_flowchart())
+            content.append("```\n")
 
         content.append("## 📋 現在の要件一覧")
         
@@ -114,3 +135,47 @@ class UnderstandingTracker:
 
         with open(self.understanding_file, "w", encoding="utf-8") as f:
             f.write("\n".join(content))
+
+    def _generate_priority_flowchart(self) -> str:
+        """優先順位を考慮したフローチャートを生成"""
+        lines = ["graph TD"]
+        
+        colors = {
+            "must_have": "#ff6b6b",     # 赤
+            "should_have": "#ffd93d",   # 黄
+            "could_have": "#6bff6b",    # 緑
+            "wont_have": "#d3d3d3"     # グレー
+        }
+        
+        # ノードの生成
+        for i, req in enumerate(self.memory.requirements):
+            node_id = f"R{i}"
+            priority = req.metadata.get('priority', 'undefined')
+            color = colors.get(priority, "#d3d3d3")
+            
+            # ノードのスタイル設定
+            lines.append(f"    {node_id}[{req.content}]")
+            lines.append(f"    style {node_id} fill:{color}")
+            
+            # 依存関係の設定
+            if 'dependencies' in req.metadata:
+                for dep in req.metadata['dependencies']:
+                    for j, other_req in enumerate(self.memory.requirements):
+                        if other_req.content == dep:
+                            lines.append(f"    R{j} --> {node_id}")
+        
+        # 凡例の追加
+        lines.append("    subgraph 優先度")
+        lines.append("    L1[Must Have]")
+        lines.append("    L2[Should Have]")
+        lines.append("    L3[Could Have]")
+        lines.append('    L4["Won\'t Have"]')
+        lines.append("    end")
+        
+        # 凡例のスタイル
+        lines.append(f"    style L1 fill:{colors['must_have']}")
+        lines.append(f"    style L2 fill:{colors['should_have']}")
+        lines.append(f"    style L3 fill:{colors['could_have']}")
+        lines.append(f"    style L4 fill:{colors['wont_have']}")
+        
+        return "\n".join(lines)
