@@ -111,21 +111,6 @@ class RequirementsVisualizer:
         
         return "\n".join(lines)
 
-    def _group_requirements(self, requirements: List[Requirement]) -> Dict[str, List[Requirement]]:
-        """要件をタイプごとにグループ化"""
-        grouped = {
-            "functional": [],
-            "non_functional": [],
-            "technical": [],
-            "business": []
-        }
-        
-        for req in requirements:
-            if req.type in grouped:
-                grouped[req.type].append(req)
-        
-        return grouped
-
     def _get_requirement_type_name(self, req_type: str) -> str:
         """要件タイプの日本語名を取得"""
         return {
