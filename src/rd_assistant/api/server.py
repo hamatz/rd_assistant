@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -10,6 +11,9 @@ from ..config import Config
 from ..llm.service import LLMServiceFactory
 from ..core.analyzer import RequirementAnalyzer
 from ..core.storage import SessionStorage
+
+# Load environment variables from .env file if present
+load_dotenv()
 
 app = FastAPI()
 app.add_middleware(
