@@ -1,6 +1,7 @@
 let sessionId = null;
 let isDarkMode = true;
 let isLoading = false;
+let backendUrl = null;
 let customImages = { userAvatar: null, botAvatar: null };
 
 function loadSettings() {
@@ -11,6 +12,12 @@ function loadSettings() {
     isDarkMode = theme === 'dark';
     document.body.className = isDarkMode ? 'dark' : 'light';
   }
+  backendUrl = localStorage.getItem('chatBackendUrl');
+  if (!backendUrl) {
+    backendUrl = window.location.origin === 'null' ? 'http://127.0.0.1:8000' : window.location.origin;
+  }
+  const urlInput = document.getElementById('backendUrlInput');
+  if (urlInput) urlInput.value = backendUrl;
   updateAvatarPreview('user');
   updateAvatarPreview('bot');
 }
@@ -18,10 +25,11 @@ function loadSettings() {
 function saveSettings() {
   localStorage.setItem('chatCustomImages', JSON.stringify(customImages));
   localStorage.setItem('chatTheme', isDarkMode ? 'dark' : 'light');
+  localStorage.setItem('chatBackendUrl', backendUrl);
 }
 
 async function initSession() {
-  const res = await fetch('/sessions', { method: 'POST' });
+  const res = await fetch(`${backendUrl}/sessions`, { method: 'POST' });
   const data = await res.json();
   sessionId = data.session_id;
   await loadVisualization();
@@ -33,7 +41,7 @@ function addInitialMessage() {
 }
 
 async function sendMessageToServer(text) {
-  const res = await fetch(`/sessions/${sessionId}/messages`, {
+  const res = await fetch(`${backendUrl}/sessions/${sessionId}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: text })
@@ -42,7 +50,7 @@ async function sendMessageToServer(text) {
 }
 
 async function loadVisualization() {
-  const res = await fetch(`/sessions/${sessionId}/visualization`);
+  const res = await fetch(`${backendUrl}/sessions/${sessionId}/visualization`);
   const data = await res.json();
   const diagramEl = document.getElementById('diagram');
   diagramEl.textContent = data.diagram;
@@ -200,6 +208,11 @@ function updateAvatarPreview(type) {
 function resetUserAvatar() { customImages.userAvatar = null; updateAvatarPreview('user'); saveSettings(); }
 function resetBotAvatar() { customImages.botAvatar = null; updateAvatarPreview('bot'); saveSettings(); }
 
+function onBackendUrlChange(e) {
+  backendUrl = e.target.value.trim();
+  saveSettings();
+}
+
 function toggleTheme() {
   isDarkMode = !isDarkMode;
   document.body.className = isDarkMode ? 'dark' : 'light';
@@ -221,5 +234,7 @@ document.getElementById('message-input').addEventListener('input', e => {
 
 document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
+  const urlInput = document.getElementById('backendUrlInput');
+  if (urlInput) urlInput.addEventListener('change', onBackendUrlChange);
   initSession();
 });

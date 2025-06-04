@@ -90,4 +90,14 @@ body {
 .checkbox-container { display: flex; align-items: center; gap: 0.75rem; margin-top: 1rem; }
 .custom-checkbox { width: 1.25rem; height: 1.25rem; cursor: pointer; accent-color: #10b981; }
 .checkbox-label { cursor: pointer; font-weight: 500; user-select: none; }
+.text-setting {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid;
+    font-size: 0.875rem;
+}
+.dark .text-setting { background-color: #1f2937; border-color: #4b5563; color: #f9fafb; }
+.light .text-setting { background-color: #f9fafb; border-color: #d1d5db; color: #1f2937; }
+.text-setting:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.1); }
 @keyframes bounce { 0%,20%,53%,80%,100% { transform: translate3d(0,0,0); } 40%,43% { transform: translate3d(0,-30px,0); } 70% { transform: translate3d(0,-15px,0); } 90% { transform: translate3d(0,-4px,0); } }

@@ -164,6 +164,7 @@ poetry run uvicorn src.rd_assistant.api.server:app --reload
 
 2. 別ターミナルで `frontend/index.html` をブラウザで開きます。
    このページは自動的にセッションを作成し、チャット結果と要件図を表示します。
+   画面右上の設定メニューからバックエンドURLを変更すると、任意のサーバーに接続できます。
 
 ## 環境変数について
 
