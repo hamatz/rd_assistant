@@ -28,3 +28,7 @@ async def test_session_lifecycle(monkeypatch):
         res3 = await ac.get(f"/sessions/{session_id}/status")
         assert res3.status_code == 200
         assert isinstance(res3.json(), dict)
+
+        res4 = await ac.get(f"/sessions/{session_id}/visualization")
+        assert res4.status_code == 200
+        assert "mindmap" in res4.json()["diagram"]

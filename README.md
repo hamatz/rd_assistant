@@ -154,6 +154,17 @@ cp .env.example .env
 poetry run python -m src.rd_assistant.main
 ```
 
+### Web インターフェースの起動
+
+1. バックエンドサーバーの起動
+
+```bash
+poetry run uvicorn rd_assistant.api.server:app --reload
+```
+
+2. 別ターミナルで `frontend/index.html` をブラウザで開きます。
+   このページは自動的にセッションを作成し、チャット結果と要件図を表示します。
+
 ## 環境変数について
 
 - `AZURE_OPENAI_API_KEY`: Azure OpenAI ServiceのAPIキー
