@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RD Assistant</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+<div id="container">
+  <div id="chat-pane">
+    <div id="chat"></div>
+    <form id="chat-form">
+      <input id="message-input" type="text" placeholder="Type a message" autocomplete="off" />
+      <button type="submit">Send</button>
+    </form>
+  </div>
+  <div id="diagram-pane">
+    <pre id="diagram"></pre>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

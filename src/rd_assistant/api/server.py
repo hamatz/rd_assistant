@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from uuid import uuid4
 from typing import Dict
 
+from ..core.visualizer import RequirementsVisualizer
+
 from ..config import Config
 from ..llm.service import LLMServiceFactory
 from ..core.analyzer import RequirementAnalyzer
@@ -48,6 +50,20 @@ async def session_status(session_id: str) -> Dict:
     if not analyzer:
         raise HTTPException(status_code=404, detail="Session not found")
     return analyzer.get_current_status()
+
+
+@app.get("/sessions/{session_id}/visualization")
+async def session_visualization(session_id: str, diagram_type: str = "mindmap") -> Dict[str, str]:
+    """Return Mermaid diagram text for the given session."""
+    analyzer = _sessions.get(session_id)
+    if not analyzer:
+        raise HTTPException(status_code=404, detail="Session not found")
+    visualizer = RequirementsVisualizer()
+    if diagram_type == "flowchart":
+        diagram = visualizer.generate_flowchart(analyzer.memory)
+    else:
+        diagram = visualizer.generate_mindmap(analyzer.memory)
+    return {"diagram": diagram}
 
 # Expose sessions dictionary for testing
 sessions = _sessions
