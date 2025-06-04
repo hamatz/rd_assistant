@@ -130,6 +130,16 @@ curl -sSL https://install.python-poetry.org | python3 -
 ```bash
 poetry install
 ```
+   開発用の依存関係（`httpx`, `pytest-asyncio` など）も必要な場合は以下のいずれかでインストールしてください。
+
+   - Poetry を利用する場合
+     ```bash
+     poetry install --with dev
+     ```
+   - `requirements-dev.txt` を利用する場合
+     ```bash
+     pip install -r requirements-dev.txt
+     ```
 
 4. 環境変数の設定
 ```bash
