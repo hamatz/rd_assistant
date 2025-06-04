@@ -159,7 +159,7 @@ poetry run python -m src.rd_assistant.main
 1. バックエンドサーバーの起動
 
 ```bash
-poetry run uvicorn rd_assistant.api.server:app --reload
+poetry run uvicorn src.rd_assistant.api.server:app --reload
 ```
 
 2. 別ターミナルで `frontend/index.html` をブラウザで開きます。
